@@ -45,7 +45,7 @@ This tool can translate text in cells and shapes within Excel files.
      python trans-excel2.py --to vi
      ```
 4. Translation results will be saved in the "output" folder
-
+<!-- 
 ## Custom Language Pairs
 
 To translate between languages other than Vietnamese and Japanese, follow these steps:
@@ -207,4 +207,4 @@ If you encounter errors:
 
 1. Check if the API key is correctly set up in the .env file
 2. Ensure all dependent libraries are installed
-3. Check file and directory access permissions
+3. Check file and directory access permissions -->
