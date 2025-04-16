@@ -1,21 +1,38 @@
-# Python bytecode
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environment
+*.so
+.Python
 venv/
-env/
+ENV/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Environment variables
 .env
 
-# IDE settings
-.vscode/
+# IDE
 .idea/
+.vscode/
+*.swp
+*.swo
 
-# Output files
+# Project specific
 output/
-*.xlsx
-*.xls
-*.pdf
-*.doc
-*.docx
+data/
+*.log
+
+# MacOS
+.DS_Store
+
+# Excel temporary files
+~$*.xlsx
+~$*.xlsx
+# Word temporary files
+~$*.doc
+~$*.docx
+~$*.txt
