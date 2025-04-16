@@ -12,15 +12,28 @@ from src.infrastructure.file_handler import FileHandler
 
 st.title("File Translation")
 
+# Model selection
+model_type = st.selectbox(
+    "Select Translation Model",
+    ["gemini", "gpt"],
+    format_func=lambda x: "Google Gemini gemini-2.0-flash" if x == "gemini" else "OpenAI GPT gpt-3.5-turbo",
+    help="Choose the AI model for translation"
+)
+
 uploaded_file = st.file_uploader(
     "Choose a file", 
     type=['xlsx', 'xls', 'pdf', 'doc', 'docx', 'csv']
 )
 
+# Language selection
 target_lang = st.selectbox(
     "Select target language",
-    ["ja", "vi"],
-    format_func=lambda x: "Japanese" if x == "ja" else "Vietnamese"
+    ["en", "ja", "vi"],
+    format_func=lambda x: {
+        "en": "English",
+        "ja": "Japanese",
+        "vi": "Vietnamese"
+    }.get(x)
 )
 
 if uploaded_file is not None:
@@ -30,7 +43,7 @@ if uploaded_file is not None:
     if st.button("Translate"):
         with st.spinner('Translating...'):
             try:
-                translation_service = TranslationService()
+                translation_service = TranslationService(model_type=model_type)  # Pass model type
                 output_path = translation_service.translate_document(
                     input_path=input_path,
                     target_lang=target_lang

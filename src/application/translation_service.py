@@ -4,9 +4,9 @@ from ..domain.translator import Translator
 from ..infrastructure.file_handler import FileHandler
 
 class TranslationService:
-    def __init__(self):
+    def __init__(self, model_type="gemini"):
         self.file_handler = FileHandler()
-        self.translator = Translator()
+        self.translator = Translator(model_type=model_type)
 
     def translate_document(self, input_path: str, target_lang: str) -> str:
         """Translate document content and save to output"""

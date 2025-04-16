@@ -5,16 +5,26 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 class Translator:
-    def __init__(self):
+    def __init__(self, model_type="gemini"):
         # Load environment variables
         load_dotenv()
         
-        self.client = OpenAI(
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            api_key=os.getenv("GEMINI_API_KEY")
-        )
-        self.batch_size = 100  # Maximum number of cells in a batch
-        self.api_delay = 2     # Delay between API calls
+        self.model_type = model_type
+        if model_type == "gemini":
+            self.client = OpenAI(
+                api_key=os.getenv("GEMINI_API_KEY"),
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            )
+            self.model_name = "gemini-2.0-flash"
+        else:  # OpenAI GPT
+            self.client = OpenAI(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://api.openai.com/v1/"
+            )
+            self.model_name = "gpt-3.5-turbo"
+            
+        self.batch_size = 100
+        self.api_delay = 2
 
     def translate_batch(self, texts: list, target_lang: str) -> list:
         """Translate a batch of texts"""
@@ -47,15 +57,14 @@ class Translator:
         try:
             # Call translation API with correct model name
             response = self.client.chat.completions.create(
-                model="gemini-2.0-flash",
+                model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.3,  # Added for more consistent translations
-                max_tokens=1024   # Added to ensure enough response length
+                temperature=0.3,
             )
-
+            
             # Split translation result
             translated_text = response.choices[0].message.content
             if not translated_text:
