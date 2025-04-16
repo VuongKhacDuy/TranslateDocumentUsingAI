@@ -50,12 +50,18 @@ class Translator:
         separator = "|||"
         combined_text = separator.join(texts)
 
-        # Determine translation direction
-        direction = "Vietnamese to Japanese" if target_lang == "ja" else "Japanese to Vietnamese"
+        # Updated translation direction logic
+        if target_lang == "en":
+            direction = "Vietnamese to English"
+        elif target_lang == "ja":
+            direction = "Vietnamese to Japanese"
+        elif target_lang == "vi":
+            direction = "Japanese to Vietnamese"
+            
         user_prompt = f"Translate the following text from {direction}, keeping segments separated by '{separator}':\n\n{combined_text}"
 
         try:
-            # Call translation API with correct model name
+            # Call translation API
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
