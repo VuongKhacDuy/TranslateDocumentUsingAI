@@ -15,10 +15,24 @@ class FileHandler:
 
     def save_uploaded_file(self, uploaded_file):
         """Save uploaded file to input directory"""
+        # Ensure input directory exists
+        self.input_dir.mkdir(parents=True, exist_ok=True)
         input_path = self.input_dir / uploaded_file.name
-        with open(input_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        return str(input_path)
+        try:
+            # Nếu file đã tồn tại, thử xóa trước
+            if input_path.exists():
+                try:
+                    input_path.unlink()
+                except Exception as e:
+                    raise PermissionError(f"Không thể ghi đè file {input_path}. Hãy đóng file nếu đang mở hoặc kiểm tra quyền ghi. Chi tiết: {e}")
+            with open(input_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            return str(input_path)
+        except Exception as e:
+            # Có thể dùng st.error nếu muốn hiển thị trên Streamlit
+            import streamlit as st
+            st.error(f"Lỗi khi lưu file: {e}")
+            raise
 
     def get_mime_type(self, file_path):
         """Get MIME type based on file extension"""

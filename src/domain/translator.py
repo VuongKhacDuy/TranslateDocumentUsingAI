@@ -15,7 +15,7 @@ class Translator:
                 api_key=os.getenv("GEMINI_API_KEY"),
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             )
-            self.model_name = "gemini-2.0-flash"
+            self.model_name = "gemini-2.5-flash-preview-05-20"
         else:  # OpenAI GPT
             self.client = OpenAI(
                 api_key=os.getenv("OPENAI_API_KEY"),
