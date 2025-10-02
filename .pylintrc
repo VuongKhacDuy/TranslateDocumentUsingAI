@@ -1,0 +1,12 @@
+[MASTER]
+init-hook='import sys; sys.path.append(".")'
+
+[MESSAGES CONTROL]
+disable=relative-beyond-top-level
+
+[VARIABLES]
+ignored-modules=xlwings,streamlit
+
+[DESIGN]
+max-args=7
+max-locals=15

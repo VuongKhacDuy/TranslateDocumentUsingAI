@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 from PyPDF2 import PdfReader
 from docx import Document
-import xlwings as xw
 
 class FileHandler:
     def __init__(self):
@@ -65,18 +64,38 @@ class FileHandler:
     def _extract_from_excel(self, file_path):
         """Extract text from Excel files"""
         texts = []
-        app = xw.App(visible=False)
         try:
-            wb = app.books.open(file_path)
-            for sheet in wb.sheets:
-                used_range = sheet.used_range
-                if used_range.count > 1:
-                    for cell in used_range:
-                        if cell.value:
-                            texts.append(str(cell.value))
-            return texts
-        finally:
-            app.quit()
+            # Import xlwings only when needed
+            import xlwings as xw
+            app = xw.App(visible=False)
+            try:
+                wb = app.books.open(file_path)
+                for sheet in wb.sheets:
+                    used_range = sheet.used_range
+                    if used_range.count > 1:
+                        for cell in used_range:
+                            if cell.value:
+                                texts.append(str(cell.value))
+                return texts
+            finally:
+                app.quit()
+        except ImportError:
+            print("⚠️ xlwings not available. Using openpyxl as fallback...")
+            # Fallback using openpyxl (read-only)
+            try:
+                from openpyxl import load_workbook
+                workbook = load_workbook(file_path, data_only=True)
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    for row in sheet.iter_rows(values_only=True):
+                        for cell in row:
+                            if cell is not None and str(cell).strip():
+                                texts.append(str(cell))
+                workbook.close()
+                return texts
+            except ImportError:
+                print("⚠️ openpyxl also not available. Cannot read Excel files.")
+                return ["Excel file reading not supported - missing dependencies"]
 
     def _extract_from_pdf(self, file_path):
         """Extract text from PDF files"""
@@ -84,7 +103,16 @@ class FileHandler:
         with open(file_path, 'rb') as file:
             pdf = PdfReader(file)
             for page in pdf.pages:
-                texts.append(page.extract_text())
+                page_text = page.extract_text()
+                if page_text.strip():  # Skip empty pages
+                    # Split long pages into paragraphs for better translation
+                    paragraphs = [p.strip() for p in page_text.split('\n\n') if p.strip()]
+                    if paragraphs:
+                        texts.extend(paragraphs)
+                    else:
+                        # If no paragraph breaks, split by single newlines
+                        lines = [line.strip() for line in page_text.split('\n') if line.strip()]
+                        texts.extend(lines)
         return texts
 
     def _extract_from_word(self, file_path):

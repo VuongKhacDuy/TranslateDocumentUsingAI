@@ -57,6 +57,7 @@ if uploaded_file is not None:
                             file_name=os.path.basename(output_path),
                             mime=file_handler.get_mime_type(output_path)
                         )
+                    st.success("✅ Translation completed successfully!")
                 else:
                     st.error("Translation failed!")
                     

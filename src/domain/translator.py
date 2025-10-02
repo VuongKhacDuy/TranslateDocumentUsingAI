@@ -15,7 +15,7 @@ class Translator:
                 api_key=os.getenv("GEMINI_API_KEY"),
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             )
-            self.model_name = "gemini-2.5-flash-preview-05-20"
+            self.model_name = "gemini-2.5-flash"
         else:  # OpenAI GPT
             self.client = OpenAI(
                 api_key=os.getenv("OPENAI_API_KEY"),
@@ -46,9 +46,11 @@ class Translator:
                 f.write(system_prompt)
             print(f"📝 Default prompt file created at: {prompt_file}")
 
-        # Combine texts with separator
-        separator = "|||"
-        combined_text = separator.join(texts)
+        # Use a more unique separator to avoid conflicts
+        separator = "▼▲▼SPLIT_HERE▼▲▼"
+        # Clean texts to avoid separator conflicts
+        cleaned_texts = [text.replace(separator, " ") for text in texts]
+        combined_text = separator.join(cleaned_texts)
 
         # Updated translation direction logic
         if target_lang == "en":
@@ -57,6 +59,9 @@ class Translator:
             direction = "Vietnamese to Japanese"
         elif target_lang == "vi":
             direction = "Japanese to Vietnamese"
+        else:
+            # Default fallback for unexpected target languages
+            direction = f"to {target_lang}"
             
         user_prompt = f"Translate the following text from {direction}, keeping segments separated by '{separator}':\n\n{combined_text}"
 
@@ -79,13 +84,36 @@ class Translator:
 
             translated_parts = translated_text.split(separator)
 
-            # Handle mismatched parts
-            if len(translated_parts) != len(texts):
-                print(f"⚠️ Number of translated parts ({len(translated_parts)}) doesn't match number of original texts ({len(texts)})")
-                if len(translated_parts) < len(texts):
+            # Handle mismatched parts with better error recovery
+            if len(translated_parts) != len(cleaned_texts):
+                print(f"⚠️ Number of translated parts ({len(translated_parts)}) doesn't match number of original texts ({len(cleaned_texts)})")
+                
+                # Try to fix common issues
+                if len(translated_parts) == 1 and len(cleaned_texts) > 1:
+                    # AI returned everything as one block, try to split by common patterns
+                    single_text = translated_parts[0]
+                    # Try splitting by double newlines first
+                    parts = [p.strip() for p in single_text.split('\n\n') if p.strip()]
+                    if len(parts) != len(cleaned_texts):
+                        # Try splitting by single newlines
+                        parts = [p.strip() for p in single_text.split('\n') if p.strip()]
+                    
+                    if len(parts) == len(cleaned_texts):
+                        translated_parts = parts
+                        print("✅ Successfully recovered translation structure")
+                    else:
+                        # Last resort: return original texts
+                        print("❌ Could not recover translation structure, returning original texts")
+                        return texts
+                        
+                elif len(translated_parts) < len(cleaned_texts):
+                    # Fill missing parts with original text
                     translated_parts.extend(texts[len(translated_parts):])
+                    print(f"⚠️ Filled {len(texts) - len(translated_parts)} missing translations with original text")
                 else:
-                    translated_parts = translated_parts[:len(texts)]
+                    # Trim excess parts
+                    translated_parts = translated_parts[:len(cleaned_texts)]
+                    print(f"⚠️ Trimmed {len(translated_parts) - len(cleaned_texts)} excess translations")
 
             # Delay to avoid API limits
             time.sleep(self.api_delay)
@@ -108,6 +136,8 @@ class Translator:
                 8. Preserve technical accuracy in translations
                 9. Keep mathematical and scientific notations unchanged
                 10. Use proper academic/technical formatting
-                11. Translate all segments separated by "|||" and keep them separated with the same delimiter
+                11. Translate all segments separated by "▼▲▼SPLIT_HERE▼▲▼" and keep them separated with the EXACT same delimiter
                 12. For technical terms, use industry-standard translations
-                13. Maintain formal register and professional tone throughout"""
+                13. Maintain formal register and professional tone throughout
+                14. CRITICAL: You must output exactly the same number of segments as the input, separated by the delimiter
+                15. Do not merge segments or split them differently than the input"""

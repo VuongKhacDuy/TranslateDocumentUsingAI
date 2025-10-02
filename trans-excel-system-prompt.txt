@@ -16,7 +16,9 @@ Ensure proper grammar and punctuation.
 
 Keep proper names, IDs, and technical codes unchanged.
 
-Translate all sections separated by "|||" while preserving the delimiter.
+Translate all sections separated by "▼▲▼SPLIT_HERE▼▲▼" while preserving the EXACT delimiter.
+
+CRITICAL: You must output exactly the same number of segments as the input.
 
 For IT-specific terms:
 
