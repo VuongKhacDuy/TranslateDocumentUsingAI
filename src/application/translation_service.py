@@ -4,9 +4,20 @@ from src.domain.translator import Translator
 from src.infrastructure.file_handler import FileHandler
 
 class TranslationService:
-    def __init__(self, model_type="gemini"):
+    def __init__(self, model_type="gemini", create_default_translator=True):
         self.file_handler = FileHandler()
-        self.translator = Translator(model_type=model_type)
+        self.model_type = model_type
+        
+        # Only create default translator if needed (for backward compatibility)
+        if create_default_translator:
+            try:
+                self.translator = Translator(model_type=model_type)
+            except Exception as e:
+                print(f"⚠️ Could not create default translator: {e}")
+                print("💡 Use dynamic API configuration instead")
+                self.translator = None
+        else:
+            self.translator = None
 
     def translate_document(self, input_path: str, target_lang: str, use_parallel: bool = False, provider_filter: str = None) -> str:
         """Translate document content and save to output"""
@@ -14,20 +25,25 @@ class TranslationService:
             if use_parallel:
                 return self._translate_with_dynamic_apis(input_path, target_lang, provider_filter)
             else:
-                # Original sequential translation
-                texts = self.file_handler.extract_text(input_path)
-                translated_texts = self.translator.translate_batch(texts, target_lang)
-                
-                # Create output path - keep original format
-                input_file = Path(input_path)
-                output_dir = Path("output")
-                output_dir.mkdir(exist_ok=True)
-                output_path = output_dir / f"{input_file.stem}-translated{input_file.suffix}"
-                
-                # Save translated content
-                self._save_translated_content(input_path, str(output_path), translated_texts)
-                
-                return str(output_path)
+                # Sequential translation - use dynamic APIs if available, otherwise default translator
+                if self.translator is None:
+                    # No default translator, use dynamic APIs
+                    return self._translate_with_dynamic_apis(input_path, target_lang, provider_filter)
+                else:
+                    # Original sequential translation with default translator
+                    texts = self.file_handler.extract_text(input_path)
+                    translated_texts = self.translator.translate_batch(texts, target_lang)
+                    
+                    # Create output path - keep original format
+                    input_file = Path(input_path)
+                    output_dir = Path("output")
+                    output_dir.mkdir(exist_ok=True)
+                    output_path = output_dir / f"{input_file.stem}-translated{input_file.suffix}"
+                    
+                    # Save translated content
+                    self._save_translated_content(input_path, str(output_path), translated_texts)
+                    
+                    return str(output_path)
             
         except Exception as e:
             print(f"Translation failed: {str(e)}")
@@ -48,23 +64,9 @@ class TranslationService:
             if not active_apis:
                 raise Exception(f"No active APIs found for provider filter: {provider_filter}")
             
-            # For simplicity, use the first available API for now
-            # In the future, this could be enhanced with actual parallel processing
-            api_config = active_apis[0]
-            
-            # Create a translator with the first API configuration
-            translator = Translator(
-                model_type=api_config["provider"],
-                api_key=api_config["api_key"],
-                base_url=api_config.get("base_url"),
-                model_name=api_config.get("model_name")
-            )
-            
-            # Extract text from document
-            texts = self.file_handler.extract_text(input_path)
-            
-            # Translate texts
-            translated_texts = translator.translate_batch(texts, target_lang)
+            # Check if this is a multi-page document that benefits from page-level processing
+            file_ext = Path(input_path).suffix.lower()
+            page_count = self.file_handler.get_page_count(input_path)
             
             # Create output path
             input_file = Path(input_path)
@@ -72,8 +74,59 @@ class TranslationService:
             output_dir.mkdir(exist_ok=True)
             output_path = output_dir / f"{input_file.stem}-translated{input_file.suffix}"
             
-            # Save translated content
-            self._save_translated_content(input_path, str(output_path), translated_texts)
+            if file_ext == '.pdf' and page_count > 1:
+                # Use page-level processing for multi-page PDFs
+                pages_texts = self.file_handler.extract_text_by_pages(input_path)
+                
+                print(f"📄 Processing {len(pages_texts)} pages from PDF...")
+                
+                # Process each page with available APIs (round-robin for now)
+                translated_pages = []
+                for page_index, page_texts in enumerate(pages_texts):
+                    if not page_texts:  # Skip empty pages
+                        translated_pages.append([])
+                        continue
+                    
+                    # Use different APIs in rotation
+                    api_config = active_apis[page_index % len(active_apis)]
+                    
+                    # Create translator for this page
+                    translator = Translator(
+                        model_type=api_config["provider"],
+                        api_key=api_config["api_key"],
+                        base_url=api_config.get("base_url"),
+                        model_name=api_config.get("model_name")
+                    )
+                    
+                    # Translate this page
+                    translated_page = translator.translate_batch(page_texts, target_lang)
+                    translated_pages.append(translated_page)
+                    
+                    print(f"✅ Page {page_index + 1}/{len(pages_texts)} completed with {api_config['custom_name']}")
+                
+                # Save using page-aware method
+                self._save_translated_content_pages(input_path, str(output_path), translated_pages)
+                
+            else:
+                # Use regular processing for single page or non-PDF documents
+                api_config = active_apis[0]
+                
+                # Create a translator with the first API configuration
+                translator = Translator(
+                    model_type=api_config["provider"],
+                    api_key=api_config["api_key"],
+                    base_url=api_config.get("base_url"),
+                    model_name=api_config.get("model_name")
+                )
+                
+                # Extract text from document
+                texts = self.file_handler.extract_text(input_path)
+                
+                # Translate texts
+                translated_texts = translator.translate_batch(texts, target_lang)
+                
+                # Save translated content
+                self._save_translated_content(input_path, str(output_path), translated_texts)
             
             return str(output_path)
             
@@ -256,3 +309,78 @@ class TranslationService:
         """Wrap text to specified width"""
         import textwrap
         return textwrap.wrap(text, width=width)
+    
+    def _save_translated_content_pages(self, input_path: str, output_path: str, translated_pages: list):
+        """Save translated content organized by pages"""
+        file_ext = Path(input_path).suffix.lower()
+        
+        if file_ext == '.pdf':
+            # For PDF files, create new PDF with translated content, preserving page structure
+            try:
+                # Import ReportLab components only when needed
+                from reportlab.lib.pagesizes import letter, A4
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+                from reportlab.lib.styles import getSampleStyleSheet
+                from reportlab.lib.units import inch
+                
+                # Try to register Unicode font
+                try:
+                    from src.infrastructure.font_utils import register_unicode_font
+                    unicode_font = register_unicode_font()
+                    font_registered = unicode_font is not None
+                except:
+                    font_registered = False
+                
+                # Create PDF document
+                doc = SimpleDocTemplate(output_path, pagesize=A4)
+                styles = getSampleStyleSheet()
+                story = []
+                
+                # Title
+                title_style = styles['Title']
+                if font_registered:
+                    title_style.fontName = unicode_font
+                story.append(Paragraph("Translated Document", title_style))
+                story.append(Spacer(1, 0.2*inch))
+                
+                # Content organized by pages
+                normal_style = styles['Normal']
+                if font_registered:
+                    normal_style.fontName = unicode_font
+                
+                for page_index, page_texts in enumerate(translated_pages):
+                    if page_index > 0:
+                        story.append(PageBreak())  # New page for each original page
+                    
+                    # Add page header
+                    story.append(Paragraph(f"<b>Page {page_index + 1}</b>", title_style))
+                    story.append(Spacer(1, 0.1*inch))
+                    
+                    # Add translated content for this page
+                    for text in page_texts:
+                        if text and text.strip():
+                            # Escape XML characters for reportlab
+                            escaped_text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                            story.append(Paragraph(escaped_text, normal_style))
+                            story.append(Spacer(1, 0.1*inch))
+                
+                # Build PDF
+                doc.build(story)
+                print(f"📄 Multi-page PDF created: {output_path}")
+                
+            except Exception as e:
+                print(f"⚠️ Failed to create structured PDF: {e}")
+                print("📄 Creating simple PDF...")
+                
+                # Fallback: flatten pages and use simple method
+                flattened_texts = []
+                for page_texts in translated_pages:
+                    flattened_texts.extend(page_texts)
+                self._save_translated_content(input_path, output_path, flattened_texts)
+        
+        else:
+            # For other file types, flatten the pages and use regular method
+            flattened_texts = []
+            for page_texts in translated_pages:
+                flattened_texts.extend(page_texts)
+            self._save_translated_content(input_path, output_path, flattened_texts)

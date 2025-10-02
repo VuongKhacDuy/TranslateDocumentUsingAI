@@ -82,8 +82,8 @@ class FileTranslationPage:
                 # Get file extension to determine translation approach
                 file_ext = Path(input_path).suffix.lower()
                 
-                # Initialize translation service
-                translation_service = TranslationService()
+                # Initialize translation service without default translator (we'll use dynamic APIs)
+                translation_service = TranslationService(create_default_translator=False)
                 
                 if use_parallel and file_ext == ".pdf":
                     st.info("Using parallel processing for PDF translation...")

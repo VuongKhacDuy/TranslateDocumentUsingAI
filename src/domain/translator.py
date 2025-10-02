@@ -5,26 +5,47 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 class Translator:
-    def __init__(self, model_type="gemini"):
-        # Load environment variables
+    def __init__(self, model_type="gemini", api_key=None, base_url=None, model_name=None):
+        # Load environment variables as fallback
         load_dotenv()
         
         self.model_type = model_type
-        if model_type == "gemini":
+        
+        # Use provided parameters or fall back to environment variables
+        if api_key and base_url:
+            # Dynamic API configuration
             self.client = OpenAI(
-                api_key=os.getenv("GEMINI_API_KEY"),
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                api_key=api_key,
+                base_url=base_url,
             )
-            self.model_name = "gemini-2.5-flash"
-        else:  # OpenAI GPT
-            self.client = OpenAI(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                base_url="https://api.openai.com/v1/"
-            )
-            self.model_name = "gpt-3.5-turbo"
+            self.model_name = model_name if model_name else self._get_default_model(model_type)
+        else:
+            # Environment-based configuration (original behavior)
+            if model_type == "gemini":
+                self.client = OpenAI(
+                    api_key=os.getenv("GEMINI_API_KEY"),
+                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                )
+                self.model_name = "gemini-2.5-flash"
+            else:  # OpenAI GPT
+                self.client = OpenAI(
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    base_url="https://api.openai.com/v1/"
+                )
+                self.model_name = "gpt-3.5-turbo"
             
         self.batch_size = 100
         self.api_delay = 2
+    
+    def _get_default_model(self, model_type):
+        """Get default model name for a provider"""
+        defaults = {
+            "gemini": "gemini-2.5-flash",
+            "openai": "gpt-3.5-turbo",
+            "claude": "claude-3-haiku-20240307",
+            "deepseek": "deepseek-chat"
+        }
+        return defaults.get(model_type, "gemini-2.5-flash")
 
     def translate_batch(self, texts: list, target_lang: str) -> list:
         """Translate a batch of texts"""
