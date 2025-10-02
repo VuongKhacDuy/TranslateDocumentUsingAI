@@ -87,9 +87,12 @@ class TranslationService:
                 def translate_page_worker(page_index, page_texts, api_config, target_lang):
                     """Worker function to translate a single page"""
                     if not page_texts:  # Skip empty pages
+                        print(f"⚠️ Page {page_index + 1} is empty, skipping")
                         return page_index, []
                     
                     try:
+                        print(f"🔄 Processing page {page_index + 1} with {api_config['custom_name']}: {len(page_texts)} text segments")
+                        
                         # Create translator for this page
                         translator = Translator(
                             model_type=api_config["provider"],
@@ -100,7 +103,13 @@ class TranslationService:
                         
                         # Translate this page
                         translated_page = translator.translate_batch(page_texts, target_lang)
-                        print(f"✅ Page {page_index + 1}/{len(pages_texts)} completed with {api_config['custom_name']}")
+                        
+                        # Debug: Check if translation actually happened
+                        if translated_page == page_texts:
+                            print(f"⚠️ Page {page_index + 1}: Translation returned original text (may have failed)")
+                        else:
+                            print(f"✅ Page {page_index + 1}/{len(pages_texts)} translated successfully with {api_config['custom_name']} ({len(translated_page)} segments)")
+                        
                         return page_index, translated_page
                         
                     except Exception as e:

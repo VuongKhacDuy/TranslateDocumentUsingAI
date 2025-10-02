@@ -73,13 +73,13 @@ class Translator:
         cleaned_texts = [text.replace(separator, " ") for text in texts]
         combined_text = separator.join(cleaned_texts)
 
-        # Updated translation direction logic
+        # Dynamic translation direction logic
         if target_lang == "en":
-            direction = "Vietnamese to English"
+            direction = "to English"
         elif target_lang == "ja":
-            direction = "Vietnamese to Japanese"
+            direction = "to Japanese"
         elif target_lang == "vi":
-            direction = "Japanese to Vietnamese"
+            direction = "to Vietnamese"
         else:
             # Default fallback for unexpected target languages
             direction = f"to {target_lang}"
@@ -87,6 +87,11 @@ class Translator:
         user_prompt = f"Translate the following text from {direction}, keeping segments separated by '{separator}':\n\n{combined_text}"
 
         try:
+            # Debug: Log original texts
+            print(f"🔍 DEBUG - Original texts ({len(texts)} items):")
+            for i, text in enumerate(texts[:3]):  # Show first 3 items
+                print(f"  [{i}]: {text[:100]}...")
+            
             # Call translation API
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -102,6 +107,10 @@ class Translator:
             if not translated_text:
                 print("❌ Empty response from translation API")
                 return texts
+            
+            # Debug: Log AI response
+            print(f"🔍 DEBUG - AI Response: {translated_text[:200]}...")
+            print(f"🔍 DEBUG - Contains separator: {separator in translated_text}")
 
             translated_parts = translated_text.split(separator)
 

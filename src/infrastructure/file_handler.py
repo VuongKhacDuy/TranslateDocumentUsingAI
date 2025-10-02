@@ -165,19 +165,28 @@ class FileHandler:
         pages_texts = []
         with open(file_path, 'rb') as file:
             pdf = PdfReader(file)
-            for page in pdf.pages:
+            print(f"🔍 DEBUG - PDF has {len(pdf.pages)} pages")
+            
+            for page_num, page in enumerate(pdf.pages):
                 page_text = page.extract_text()
                 if page_text.strip():
                     # Split page into paragraphs/lines for better translation
                     paragraphs = [p.strip() for p in page_text.split('\n\n') if p.strip()]
                     if paragraphs:
                         pages_texts.append(paragraphs)
+                        if page_num < 3:  # Debug first 3 pages
+                            print(f"🔍 DEBUG - Page {page_num + 1} has {len(paragraphs)} paragraphs:")
+                            for i, p in enumerate(paragraphs[:2]):  # Show first 2 paragraphs
+                                print(f"    [{i}]: {p[:50]}...")
                     else:
                         # If no paragraph breaks, split by single newlines
                         lines = [line.strip() for line in page_text.split('\n') if line.strip()]
                         pages_texts.append(lines)
+                        if page_num < 3:
+                            print(f"🔍 DEBUG - Page {page_num + 1} has {len(lines)} lines")
                 else:
                     pages_texts.append([])  # Empty page
+                    print(f"🔍 DEBUG - Page {page_num + 1} is empty")
         return pages_texts
     
     def _extract_from_excel_by_sheets(self, file_path):
