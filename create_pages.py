@@ -1,4 +1,7 @@
-import streamlit as st
+import os
+
+# File translation page content
+file_translation_content = '''import streamlit as st
 import os
 from pathlib import Path
 import sys
@@ -143,3 +146,112 @@ class FileTranslationPage:
             except Exception as e:
                 st.error(f"Translation failed: {str(e)}")
                 st.exception(e)
+'''
+
+# Text translation page content
+text_translation_content = '''import streamlit as st
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.append(str(project_root))
+
+from src.domain.translator import Translator
+from src.infrastructure.multi_api_manager import APIProvider
+
+class TextTranslationPage:
+    def __init__(self):
+        pass
+    
+    def render(self):
+        st.header("📝 Text Translation")
+        
+        # Check for configured APIs
+        if "api_manager" in st.session_state:
+            active_apis = st.session_state.api_manager.get_active_apis()
+            if not active_apis:
+                st.warning("⚠️ No APIs configured. Please go to API Management to add at least one API.")
+                return
+        else:
+            st.error("API Manager not initialized. Please restart the application.")
+            return
+        
+        # Provider selection
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            provider_filter = st.selectbox(
+                "Select Provider",
+                [provider.value for provider in APIProvider],
+                format_func=lambda x: {
+                    "gemini": "Google Gemini",
+                    "openai": "OpenAI GPT",
+                    "claude": "Anthropic Claude",
+                    "deepseek": "DeepSeek"
+                }.get(x, x),
+                help="Choose which AI provider to use for translation"
+            )
+        
+        with col2:
+            target_lang = st.selectbox(
+                "Select target language",
+                ["en", "ja", "vi"],
+                format_func=lambda x: {
+                    "en": "English",
+                    "ja": "Japanese",
+                    "vi": "Vietnamese"
+                }.get(x)
+            )
+        
+        # Text input
+        input_text = st.text_area(
+            "Enter text to translate",
+            height=200
+        )
+        
+        if st.button("🚀 Translate", type="primary"):
+            if input_text:
+                self._perform_text_translation(input_text, target_lang, provider_filter)
+            else:
+                st.warning("Please enter text to translate")
+    
+    def _perform_text_translation(self, input_text, target_lang, provider_filter):
+        """Handle text translation"""
+        with st.spinner("Translating..."):
+            try:
+                # Get a specific API for the selected provider
+                api_manager = st.session_state.api_manager
+                provider_enum = APIProvider(provider_filter)
+                selected_apis = api_manager.get_active_apis(provider_filter=provider_enum)
+                
+                if not selected_apis:
+                    st.error(f"No active APIs found for provider: {provider_filter}")
+                    return
+                
+                # Use the first available API for the provider
+                selected_api = selected_apis[0]
+                translator = Translator(
+                    api_key=selected_api.api_key,
+                    base_url=selected_api.base_url,
+                    model_name=selected_api.model_name
+                )
+                
+                translated_text = translator.translate_batch([input_text], target_lang)[0]
+                
+                st.success("Translation completed!")
+                st.text_area("Translated text:", value=translated_text, height=200, disabled=True)
+                
+            except Exception as e:
+                st.error(f"Translation failed: {str(e)}")
+                st.exception(e)
+'''
+
+# Write files
+with open('src/presentation/pages/file_translation.py', 'w', encoding='utf-8') as f:
+    f.write(file_translation_content)
+
+with open('src/presentation/pages/text_translation.py', 'w', encoding='utf-8') as f:
+    f.write(text_translation_content)
+
+print("Files created successfully!")

@@ -8,16 +8,65 @@ class TranslationService:
         self.file_handler = FileHandler()
         self.translator = Translator(model_type=model_type)
 
-    def translate_document(self, input_path: str, target_lang: str) -> str:
+    def translate_document(self, input_path: str, target_lang: str, use_parallel: bool = False, provider_filter: str = None) -> str:
         """Translate document content and save to output"""
         try:
+            if use_parallel:
+                return self._translate_with_dynamic_apis(input_path, target_lang, provider_filter)
+            else:
+                # Original sequential translation
+                texts = self.file_handler.extract_text(input_path)
+                translated_texts = self.translator.translate_batch(texts, target_lang)
+                
+                # Create output path - keep original format
+                input_file = Path(input_path)
+                output_dir = Path("output")
+                output_dir.mkdir(exist_ok=True)
+                output_path = output_dir / f"{input_file.stem}-translated{input_file.suffix}"
+                
+                # Save translated content
+                self._save_translated_content(input_path, str(output_path), translated_texts)
+                
+                return str(output_path)
+            
+        except Exception as e:
+            print(f"Translation failed: {str(e)}")
+            return None
+
+    def _translate_with_dynamic_apis(self, input_path: str, target_lang: str, provider_filter: str = None) -> str:
+        """Translate using dynamic API configurations from Streamlit session"""
+        try:
+            import streamlit as st
+            
+            # Get dynamic API manager from session
+            if 'api_manager' not in st.session_state:
+                raise Exception("No API manager found in session state")
+            
+            api_manager = st.session_state.api_manager
+            active_apis = api_manager.get_active_apis(provider_filter)
+            
+            if not active_apis:
+                raise Exception(f"No active APIs found for provider filter: {provider_filter}")
+            
+            # For simplicity, use the first available API for now
+            # In the future, this could be enhanced with actual parallel processing
+            api_config = active_apis[0]
+            
+            # Create a translator with the first API configuration
+            translator = Translator(
+                model_type=api_config["provider"],
+                api_key=api_config["api_key"],
+                base_url=api_config.get("base_url"),
+                model_name=api_config.get("model_name")
+            )
+            
             # Extract text from document
             texts = self.file_handler.extract_text(input_path)
             
             # Translate texts
-            translated_texts = self.translator.translate_batch(texts, target_lang)
+            translated_texts = translator.translate_batch(texts, target_lang)
             
-            # Create output path - keep original format
+            # Create output path
             input_file = Path(input_path)
             output_dir = Path("output")
             output_dir.mkdir(exist_ok=True)
@@ -29,8 +78,9 @@ class TranslationService:
             return str(output_path)
             
         except Exception as e:
-            print(f"Translation failed: {str(e)}")
-            return None
+            print(f"Dynamic API translation failed: {str(e)}")
+            # Fallback to default translator
+            return self.translate_document(input_path, target_lang, use_parallel=False)
 
     def _save_translated_content(self, input_path: str, output_path: str, translated_texts: list):
         """Save translated content back to file with original formatting"""
