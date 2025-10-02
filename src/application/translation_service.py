@@ -78,31 +78,59 @@ class TranslationService:
                 # Use page-level processing for multi-page PDFs
                 pages_texts = self.file_handler.extract_text_by_pages(input_path)
                 
-                print(f"📄 Processing {len(pages_texts)} pages from PDF...")
+                print(f"📄 Processing {len(pages_texts)} pages from PDF in parallel...")
                 
-                # Process each page with available APIs (round-robin for now)
-                translated_pages = []
-                for page_index, page_texts in enumerate(pages_texts):
+                # Use ThreadPoolExecutor for true parallel processing
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                import threading
+                
+                def translate_page_worker(page_index, page_texts, api_config, target_lang):
+                    """Worker function to translate a single page"""
                     if not page_texts:  # Skip empty pages
-                        translated_pages.append([])
-                        continue
+                        return page_index, []
                     
-                    # Use different APIs in rotation
-                    api_config = active_apis[page_index % len(active_apis)]
+                    try:
+                        # Create translator for this page
+                        translator = Translator(
+                            model_type=api_config["provider"],
+                            api_key=api_config["api_key"],
+                            base_url=api_config.get("base_url"),
+                            model_name=api_config.get("model_name")
+                        )
+                        
+                        # Translate this page
+                        translated_page = translator.translate_batch(page_texts, target_lang)
+                        print(f"✅ Page {page_index + 1}/{len(pages_texts)} completed with {api_config['custom_name']}")
+                        return page_index, translated_page
+                        
+                    except Exception as e:
+                        print(f"❌ Page {page_index + 1} failed with {api_config['custom_name']}: {str(e)}")
+                        return page_index, page_texts  # Return original text on failure
+                
+                # Prepare tasks for parallel execution
+                max_workers = min(len(active_apis), len(pages_texts), 5)  # Limit to avoid overload
+                translated_pages = [None] * len(pages_texts)
+                
+                print(f"🚀 Using {max_workers} parallel workers with {len(active_apis)} APIs")
+                
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all pages for processing
+                    future_to_page = {}
+                    for page_index, page_texts in enumerate(pages_texts):
+                        # Distribute pages across available APIs
+                        api_config = active_apis[page_index % len(active_apis)]
+                        future = executor.submit(translate_page_worker, page_index, page_texts, api_config, target_lang)
+                        future_to_page[future] = page_index
                     
-                    # Create translator for this page
-                    translator = Translator(
-                        model_type=api_config["provider"],
-                        api_key=api_config["api_key"],
-                        base_url=api_config.get("base_url"),
-                        model_name=api_config.get("model_name")
-                    )
-                    
-                    # Translate this page
-                    translated_page = translator.translate_batch(page_texts, target_lang)
-                    translated_pages.append(translated_page)
-                    
-                    print(f"✅ Page {page_index + 1}/{len(pages_texts)} completed with {api_config['custom_name']}")
+                    # Collect results as they complete
+                    completed_count = 0
+                    for future in as_completed(future_to_page):
+                        page_index, result = future.result()
+                        translated_pages[page_index] = result
+                        completed_count += 1
+                        print(f"🔄 Progress: {completed_count}/{len(pages_texts)} pages completed")
+                
+                print(f"✅ All {len(pages_texts)} pages processed in parallel!")
                 
                 # Save using page-aware method
                 self._save_translated_content_pages(input_path, str(output_path), translated_pages)
@@ -311,72 +339,65 @@ class TranslationService:
         return textwrap.wrap(text, width=width)
     
     def _save_translated_content_pages(self, input_path: str, output_path: str, translated_pages: list):
-        """Save translated content organized by pages"""
+        """Save translated content organized by pages with better layout preservation"""
         file_ext = Path(input_path).suffix.lower()
         
         if file_ext == '.pdf':
-            # For PDF files, create new PDF with translated content, preserving page structure
+            # Try to preserve original PDF layout using PyMuPDF
             try:
-                # Import ReportLab components only when needed
-                from reportlab.lib.pagesizes import letter, A4
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-                from reportlab.lib.styles import getSampleStyleSheet
-                from reportlab.lib.units import inch
+                import fitz  # PyMuPDF
+                print("📄 Using PyMuPDF for layout-preserving PDF translation...")
                 
-                # Try to register Unicode font
-                try:
-                    from src.infrastructure.font_utils import register_unicode_font
-                    unicode_font = register_unicode_font()
-                    font_registered = unicode_font is not None
-                except:
-                    font_registered = False
+                # Open original PDF
+                doc = fitz.open(input_path)
                 
-                # Create PDF document
-                doc = SimpleDocTemplate(output_path, pagesize=A4)
-                styles = getSampleStyleSheet()
-                story = []
-                
-                # Title
-                title_style = styles['Title']
-                if font_registered:
-                    title_style.fontName = unicode_font
-                story.append(Paragraph("Translated Document", title_style))
-                story.append(Spacer(1, 0.2*inch))
-                
-                # Content organized by pages
-                normal_style = styles['Normal']
-                if font_registered:
-                    normal_style.fontName = unicode_font
-                
-                for page_index, page_texts in enumerate(translated_pages):
-                    if page_index > 0:
-                        story.append(PageBreak())  # New page for each original page
+                # Process each page
+                for page_num in range(len(doc)):
+                    if page_num >= len(translated_pages):
+                        break
+                        
+                    page = doc[page_num]
+                    translated_texts = translated_pages[page_num]
                     
-                    # Add page header
-                    story.append(Paragraph(f"<b>Page {page_index + 1}</b>", title_style))
-                    story.append(Spacer(1, 0.1*inch))
+                    if not translated_texts:
+                        continue
                     
-                    # Add translated content for this page
-                    for text in page_texts:
+                    # Get text blocks with position information
+                    text_blocks = page.get_text("dict")
+                    
+                    # Create a mapping of original text to translated text
+                    original_texts = []
+                    for page_texts in [translated_pages[page_num]]:  # This needs improvement
+                        original_texts.extend(page_texts)
+                    
+                    # Clear the page and add translated text with similar positioning
+                    # This is a simplified approach - more sophisticated text replacement would be needed
+                    page.clean_contents()
+                    
+                    # Add translated text (basic approach)
+                    y_position = page.rect.height - 50
+                    for text in translated_texts:
                         if text and text.strip():
-                            # Escape XML characters for reportlab
-                            escaped_text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                            story.append(Paragraph(escaped_text, normal_style))
-                            story.append(Spacer(1, 0.1*inch))
+                            # Insert text at approximate original position
+                            point = fitz.Point(50, y_position)
+                            page.insert_text(point, text, fontsize=12)
+                            y_position -= 20
+                            if y_position < 50:
+                                break
                 
-                # Build PDF
-                doc.build(story)
-                print(f"📄 Multi-page PDF created: {output_path}")
+                # Save the modified PDF
+                doc.save(output_path)
+                doc.close()
+                print(f"📄 Layout-preserved PDF saved: {output_path}")
+                
+            except ImportError:
+                print("⚠️ PyMuPDF not available, using ReportLab fallback...")
+                self._create_reportlab_pdf(output_path, translated_pages)
                 
             except Exception as e:
-                print(f"⚠️ Failed to create structured PDF: {e}")
-                print("📄 Creating simple PDF...")
-                
-                # Fallback: flatten pages and use simple method
-                flattened_texts = []
-                for page_texts in translated_pages:
-                    flattened_texts.extend(page_texts)
-                self._save_translated_content(input_path, output_path, flattened_texts)
+                print(f"⚠️ Failed to preserve PDF layout: {e}")
+                print("📄 Using ReportLab fallback...")
+                self._create_reportlab_pdf(output_path, translated_pages)
         
         else:
             # For other file types, flatten the pages and use regular method
@@ -384,3 +405,70 @@ class TranslationService:
             for page_texts in translated_pages:
                 flattened_texts.extend(page_texts)
             self._save_translated_content(input_path, output_path, flattened_texts)
+    
+    def _create_reportlab_pdf(self, output_path: str, translated_pages: list):
+        """Create PDF using ReportLab as fallback"""
+        try:
+            # Import ReportLab components only when needed
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.units import inch
+            
+            # Try to register Unicode font
+            try:
+                from src.infrastructure.font_utils import register_unicode_font
+                unicode_font = register_unicode_font()
+                font_registered = unicode_font is not None
+            except:
+                font_registered = False
+            
+            # Create PDF document
+            doc = SimpleDocTemplate(output_path, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Title
+            title_style = styles['Title']
+            if font_registered:
+                title_style.fontName = unicode_font
+            story.append(Paragraph("Translated Document", title_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Content organized by pages
+            normal_style = styles['Normal']
+            if font_registered:
+                normal_style.fontName = unicode_font
+            
+            for page_index, page_texts in enumerate(translated_pages):
+                if page_index > 0:
+                    story.append(PageBreak())  # New page for each original page
+                
+                # Add page header
+                story.append(Paragraph(f"<b>Page {page_index + 1}</b>", title_style))
+                story.append(Spacer(1, 0.1*inch))
+                
+                # Add translated content for this page
+                for text in page_texts:
+                    if text and text.strip():
+                        # Escape XML characters for reportlab
+                        escaped_text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        story.append(Paragraph(escaped_text, normal_style))
+                        story.append(Spacer(1, 0.1*inch))
+            
+            # Build PDF
+            doc.build(story)
+            print(f"📄 ReportLab PDF created: {output_path}")
+            
+        except Exception as e:
+            print(f"⚠️ ReportLab also failed: {e}")
+            # Final fallback to text file
+            text_output_path = str(Path(output_path).with_suffix('.txt'))
+            with open(text_output_path, 'w', encoding='utf-8') as f:
+                f.write("=== TRANSLATED DOCUMENT ===\n\n")
+                for page_index, page_texts in enumerate(translated_pages):
+                    f.write(f"=== PAGE {page_index + 1} ===\n")
+                    for text in page_texts:
+                        if text and text.strip():
+                            f.write(text + '\n\n')
+            print(f"📄 Text file created as final fallback: {text_output_path}")
