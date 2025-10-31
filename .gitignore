@@ -40,3 +40,6 @@ data/
 ~$*.doc
 ~$*.docx
 ~$*.txt
+
+*.pyc
+*/__pycache__/*

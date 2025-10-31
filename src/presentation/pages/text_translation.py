@@ -46,11 +46,11 @@ class TextTranslationPage:
             target_lang = st.selectbox(
                 "Select target language",
                 ["en", "ja", "vi"],
-                format_func=lambda x: {
+                format_func={
                     "en": "English",
                     "ja": "Japanese",
                     "vi": "Vietnamese"
-                }.get(x)
+                }.get
             )
         
         # Text input
@@ -66,31 +66,33 @@ class TextTranslationPage:
                 st.warning("Please enter text to translate")
     
     def _perform_text_translation(self, input_text, target_lang, provider_filter):
-        """Handle text translation"""
+        """Handle text translation for multiple paragraphs/lines"""
         with st.spinner("Translating..."):
             try:
                 # Get a specific API for the selected provider
                 api_manager = st.session_state.api_manager
                 provider_enum = APIProvider(provider_filter)
                 selected_apis = api_manager.get_active_apis(provider_filter=provider_enum)
-                
                 if not selected_apis:
                     st.error(f"No active APIs found for provider: {provider_filter}")
                     return
-                
-                # Use the first available API for the provider
                 selected_api = selected_apis[0]
                 translator = Translator(
-                    api_key=selected_api.api_key,
-                    base_url=selected_api.base_url,
-                    model_name=selected_api.model_name
+                    model_type=selected_api["provider"],
+                    api_key=selected_api["api_key"],
+                    base_url=selected_api.get("base_url"),
+                    model_name=selected_api.get("model_name")
                 )
-                
-                translated_text = translator.translate_batch([input_text], target_lang)[0]
-                
+                # Split input into paragraphs (by double newline or single newline)
+                paragraphs = [p for p in input_text.split('\n') if p.strip()]
+                if not paragraphs:
+                    st.warning("No valid text segments to translate.")
+                    return
+                translated_segments = translator.translate_batch(paragraphs, target_lang)
+                # Rejoin translated segments with newline
+                translated_text = '\n'.join(translated_segments)
                 st.success("Translation completed!")
                 st.text_area("Translated text:", value=translated_text, height=200, disabled=True)
-                
-            except Exception as e:
+            except (ValueError, KeyError, TypeError) as e:
                 st.error(f"Translation failed: {str(e)}")
                 st.exception(e)

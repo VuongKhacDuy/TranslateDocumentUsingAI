@@ -1,47 +1,11 @@
 [
   {
     "provider": "gemini",
-    "api_key": "AIzaSyBXgo5iu6ir39sD4USlAm2aSOpKxOFjCQM",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    "model_name": "gemini-2.5-flash",
-    "max_requests_per_minute": 15,
-    "custom_name": "2",
-    "is_active": true
-  },
-  {
-    "provider": "gemini",
-    "api_key": "AIzaSyCWq5PlEFGQRT-852h28YAS1o1Mjv4bmXQ",
+    "api_key": "AIzaSyCX_IG2j66j3t0nMHMv1yBIRk52r2nc05E",
     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "model_name": "gemini-2.5-flash",
     "max_requests_per_minute": 15,
     "custom_name": "1",
-    "is_active": true
-  },
-  {
-    "provider": "gemini",
-    "api_key": "AIzaSyBOxYlQqnamN5anj3HoDp3vRv5ID5Q1YbA",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    "model_name": "gemini-2.5-flash",
-    "max_requests_per_minute": 15,
-    "custom_name": "3",
-    "is_active": true
-  },
-  {
-    "provider": "gemini",
-    "api_key": "AIzaSyDpLfEPOPYm3EJAXEML9cCLTH39F_9W7Us",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    "model_name": "gemini-2.5-flash",
-    "max_requests_per_minute": 15,
-    "custom_name": "4",
-    "is_active": true
-  },
-  {
-    "provider": "gemini",
-    "api_key": "AIzaSyAlmwYtnMpwitA44gitQoD4Lw5iDO0Ml7Q",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    "model_name": "gemini-2.5-flash",
-    "max_requests_per_minute": 15,
-    "custom_name": "5",
     "is_active": true
   }
 ]
