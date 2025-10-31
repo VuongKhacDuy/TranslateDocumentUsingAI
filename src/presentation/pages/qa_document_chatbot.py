@@ -19,6 +19,7 @@ sys.path.append(str(project_root))
 from src.domain.translator import Translator
 from src.infrastructure.multi_api_manager import APIProvider
 from src.infrastructure.file_handler import FileHandler
+from src.domain.agents import MultiAgentCoordinator
 
 class LocalDocumentAnalyzer:
     """Local document analysis and question answering without third-party AI models"""
@@ -124,6 +125,9 @@ class QADocumentChatbotPage:
         
         # Initialize local analyzer
         local_analyzer = LocalDocumentAnalyzer()
+        
+        # Initialize multi-agent coordinator
+        multi_agent_coordinator = MultiAgentCoordinator()
 
         # Check for configured APIs
         api_manager = None
@@ -153,8 +157,9 @@ class QADocumentChatbotPage:
             return provider_labels.get(x, str(x))
 
         # Add local processing option
-        all_providers = available_providers + ["local"] if available_providers else ["local", "gemini", "openai", "claude", "deepseek"]
+        all_providers = available_providers + ["local", "multi-agent"] if available_providers else ["local", "multi-agent", "gemini", "openai", "claude", "deepseek"]
         provider_labels["local"] = "🧠 Xử lý cục bộ (không AI bên ngoài)"
+        provider_labels["multi-agent"] = "🤖 Multi-Agent (chuyên sâu theo lĩnh vực)"
 
         provider = st.selectbox(
             "Chọn nhà cung cấp AI",
@@ -234,11 +239,17 @@ class QADocumentChatbotPage:
                         
                         answer = ""
                         
-                        # Check if using local processing
+                        # Check which processing mode to use
                         if provider == "local":
                             # Use local document analyzer
                             if st.session_state.document_content:
                                 answer = local_analyzer.answer_question(st.session_state.document_content, question)
+                            else:
+                                answer = "Không có nội dung tài liệu để phân tích."
+                        elif provider == "multi-agent":
+                            # Use multi-agent coordinator
+                            if st.session_state.document_content:
+                                answer = multi_agent_coordinator.answer_question(st.session_state.document_content, question)
                             else:
                                 answer = "Không có nội dung tài liệu để phân tích."
                         else:
@@ -336,3 +347,4 @@ class QADocumentChatbotPage:
 
         st.info("Hướng dẫn: Tải lên tài liệu của bạn, chọn nhà cung cấp AI, sau đó đặt câu hỏi về tài liệu đó.")
         st.info("💡 Mẹo: Chọn 'Xử lý cục bộ (không AI bên ngoài)' để xử lý tài liệu mà không cần kết nối internet hoặc API key.")
+        st.info("💡 Mẹo: Chọn 'Multi-Agent (chuyên sâu theo lĩnh vực)' để phân tích tài liệu theo các lĩnh vực chuyên biệt (tài chính, nhân sự, thiết bị, hạ tầng).")
