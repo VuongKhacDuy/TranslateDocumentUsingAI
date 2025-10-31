@@ -12,3 +12,7 @@ pylint
 reportlab
 PyMuPDF
 setuptools
+pyautogui 
+pillow 
+pytesseract 
+opencv-python

@@ -15,7 +15,6 @@ class TextTranslationPage:
     
     def render(self):
         st.header("📝 Text Translation")
-        
         # Check for configured APIs
         if "api_manager" in st.session_state:
             active_apis = st.session_state.api_manager.get_active_apis()
@@ -25,10 +24,8 @@ class TextTranslationPage:
         else:
             st.error("API Manager not initialized. Please restart the application.")
             return
-        
         # Provider selection
         col1, col2 = st.columns(2)
-        
         with col1:
             provider_filter = st.selectbox(
                 "Select Provider",
@@ -41,7 +38,6 @@ class TextTranslationPage:
                 }.get(x, x),
                 help="Choose which AI provider to use for translation"
             )
-        
         with col2:
             target_lang = st.selectbox(
                 "Select target language",
@@ -52,24 +48,34 @@ class TextTranslationPage:
                     "vi": "Vietnamese"
                 }.get
             )
-        
         # Text input
         input_text = st.text_area(
             "Enter text to translate",
             height=200
         )
-        
+        # Tách đoạn
+        segments = [p for p in input_text.split('\n') if p.strip()] if input_text else []
+        selected_segments = []
+        if segments:
+            selected_segments = st.multiselect(
+                "Chọn vùng (đoạn) để dịch:",
+                segments,
+                default=segments,
+                help="Chỉ các đoạn được chọn sẽ được dịch"
+            )
         if st.button("🚀 Translate", type="primary"):
             if input_text:
-                self._perform_text_translation(input_text, target_lang, provider_filter)
+                if selected_segments:
+                    self._perform_text_translation_segments(selected_segments, target_lang, provider_filter)
+                else:
+                    st.warning("Vui lòng chọn ít nhất một vùng (đoạn) để dịch.")
             else:
                 st.warning("Please enter text to translate")
     
-    def _perform_text_translation(self, input_text, target_lang, provider_filter):
-        """Handle text translation for multiple paragraphs/lines"""
-        with st.spinner("Translating..."):
+    def _perform_text_translation_segments(self, segments, target_lang, provider_filter):
+        """Translate only selected segments"""
+        with st.spinner("Translating các vùng đã chọn..."):
             try:
-                # Get a specific API for the selected provider
                 api_manager = st.session_state.api_manager
                 provider_enum = APIProvider(provider_filter)
                 selected_apis = api_manager.get_active_apis(provider_filter=provider_enum)
@@ -83,16 +89,10 @@ class TextTranslationPage:
                     base_url=selected_api.get("base_url"),
                     model_name=selected_api.get("model_name")
                 )
-                # Split input into paragraphs (by double newline or single newline)
-                paragraphs = [p for p in input_text.split('\n') if p.strip()]
-                if not paragraphs:
-                    st.warning("No valid text segments to translate.")
-                    return
-                translated_segments = translator.translate_batch(paragraphs, target_lang)
-                # Rejoin translated segments with newline
+                translated_segments = translator.translate_batch(segments, target_lang)
                 translated_text = '\n'.join(translated_segments)
-                st.success("Translation completed!")
-                st.text_area("Translated text:", value=translated_text, height=200, disabled=True)
+                st.success("Đã dịch các vùng đã chọn!")
+                st.text_area("Kết quả dịch:", value=translated_text, height=200, disabled=True)
             except (ValueError, KeyError, TypeError) as e:
                 st.error(f"Translation failed: {str(e)}")
                 st.exception(e)
