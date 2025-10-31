@@ -1,6 +1,12 @@
 import streamlit as st
 import sys
 from pathlib import Path
+import pyautogui
+import pytesseract
+import cv2
+import numpy as np
+from PIL import Image
+import io
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
@@ -27,26 +33,31 @@ class TextTranslationPage:
         # Provider selection
         col1, col2 = st.columns(2)
         with col1:
-            provider_filter = st.selectbox(
-                "Select Provider",
-                [provider.value for provider in APIProvider],
-                format_func=lambda x: {
+            provider_options = [provider.value for provider in APIProvider]
+            def format_provider(x):
+                return {
                     "gemini": "Google Gemini",
                     "openai": "OpenAI GPT",
                     "claude": "Anthropic Claude",
                     "deepseek": "DeepSeek"
-                }.get(x, x),
+                }.get(x, str(x))
+            provider_filter = st.selectbox(
+                "Select Provider",
+                provider_options,
+                format_func=format_provider,
                 help="Choose which AI provider to use for translation"
             )
         with col2:
-            target_lang = st.selectbox(
-                "Select target language",
-                ["en", "ja", "vi"],
-                format_func={
+            def format_language(x):
+                return {
                     "en": "English",
                     "ja": "Japanese",
                     "vi": "Vietnamese"
-                }.get
+                }.get(x, str(x))
+            target_lang = st.selectbox(
+                "Select target language",
+                ["en", "ja", "vi"],
+                format_func=format_language
             )
         # Text input
         if 'ocr_text' not in st.session_state:
@@ -58,24 +69,18 @@ class TextTranslationPage:
         )
         # Nút OCR vùng màn hình
         if st.button("🖼️ OCR vùng màn hình"):
-            import subprocess
-            import sys
-            result = subprocess.run([sys.executable, "screen_ocr_translate.py"], capture_output=True, text=True)
-            # Lấy kết quả OCR từ stdout
-            ocr_text = ''
-            for line in result.stdout.splitlines():
-                if line.startswith('--- OCR Text ---'):
-                    ocr_text = ''
-                elif line.startswith('--- Translated ---'):
-                    break
-                else:
-                    ocr_text += line + '\n'
-            st.session_state['ocr_text'] = ocr_text.strip()
             try:
-                st.rerun()
-            except AttributeError:
-                # Nếu phiên bản cũ, bỏ qua rerun hoặc thông báo
-                st.warning("Vui lòng reload lại trang để cập nhật kết quả OCR.")
+                ocr_text = self._perform_screen_ocr()
+                if ocr_text:
+                    st.session_state['ocr_text'] = ocr_text
+                    st.success("OCR completed successfully!")
+                    st.rerun()
+                else:
+                    st.warning("No text detected in the selected region.")
+            except Exception as e:
+                st.error(f"OCR failed: {str(e)}")
+                st.info("Make sure you have installed all required dependencies: pip install pyautogui opencv-python")
+        
         # Tách đoạn
         segments = [p for p in input_text.split('\n') if p.strip()] if input_text else []
         selected_segments = []
@@ -94,6 +99,37 @@ class TextTranslationPage:
                     st.warning("Vui lòng chọn ít nhất một vùng (đoạn) để dịch.")
             else:
                 st.warning("Please enter text to translate")
+    
+    def _perform_screen_ocr(self):
+        """Perform screen OCR and return detected text"""
+        try:
+            # Step 1: Capture screenshot
+            screenshot = pyautogui.screenshot()
+            screenshot_np = np.array(screenshot)
+            screenshot_bgr = cv2.cvtColor(screenshot_np, cv2.COLOR_RGB2BGR)
+            
+            # Step 2: Select ROI (Region of Interest)
+            st.info("Please select the region on the screen for OCR. Press ENTER to confirm or ESC to cancel.")
+            cv2.imshow('Select region', screenshot_bgr)
+            roi = cv2.selectROI('Select region', screenshot_bgr, showCrosshair=True)
+            cv2.destroyAllWindows()
+            
+            # Check if user cancelled selection
+            x, y, w, h = roi
+            if w == 0 or h == 0:
+                return ""
+            
+            # Step 3: Crop the selected region
+            region_img = screenshot.crop((x, y, x + w, y + h))
+            
+            # Step 4: OCR
+            # Try multiple languages for better detection
+            text = pytesseract.image_to_string(region_img, lang='eng+jpn+vie')
+            return text.strip()
+            
+        except Exception as e:
+            st.error(f"OCR Error: {str(e)}")
+            return ""
     
     def _perform_text_translation_segments(self, segments, target_lang, provider_filter):
         """Translate only selected segments"""

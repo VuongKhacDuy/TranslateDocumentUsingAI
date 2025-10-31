@@ -323,8 +323,7 @@ class DynamicAPIManager:
                     api_key=api_data["api_key"],
                     base_url=api_data["base_url"],
                     model_name=api_data["model_name"],
-                    max_requests_per_minute=api_data.get("max_requests_per_minute", 15),
-                    custom_name=api_data.get("custom_name", f"{api_data['provider']} API")
+                    max_requests_per_minute=api_data.get("max_requests_per_minute", 15)
                 )
                 api_configs.append(config)
             except ValueError as e:

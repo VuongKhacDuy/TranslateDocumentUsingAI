@@ -1,26 +1,93 @@
-import streamlit as st
-import os
 import sys
+import os
+import importlib.util
+import streamlit as st
 from pathlib import Path
 import warnings
 import asyncio
 import signal
 import threading
 
-from src.application.translation_service import TranslationService
-from src.infrastructure.file_handler import FileHandler
-from src.presentation.pages.file_translation import FileTranslationPage
-from src.presentation.pages.text_translation import TextTranslationPage
-from src.presentation.pages.api_management import DynamicAPIManager
+# More robust way to determine project root
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# Ignore RuntimeWarnings
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+def import_module_from_path(module_name, module_path):
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None:
+        raise ImportError(f"Could not load spec for module {module_name} from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    loader = spec.loader
+    if loader is None:
+        raise ImportError(f"Could not load loader for module {module_name} from {module_path}")
+    loader.exec_module(module)
+    return module
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.append(str(project_root))
+# Import required modules with proper error handling
+try:
+    TranslationService = import_module_from_path(
+        "translation_service",
+        os.path.join(project_root, "src", "application", "translation_service.py")
+    ).TranslationService
+except FileNotFoundError as e:
+    print(f"Error importing translation_service: {e}")
+    print(f"project_root: {project_root}")
+    print(f"Files in src/application/: {os.listdir(os.path.join(project_root, 'src', 'application')) if os.path.exists(os.path.join(project_root, 'src', 'application')) else 'Directory not found'}")
+    raise
+except Exception as e:
+    print(f"Error importing translation_service: {e}")
+    raise
 
+try:
+    FileHandler = import_module_from_path(
+        "file_handler",
+        os.path.join(project_root, "src", "infrastructure", "file_handler.py")
+    ).FileHandler
+except FileNotFoundError as e:
+    print(f"Error importing file_handler: {e}")
+    raise
+except Exception as e:
+    print(f"Error importing file_handler: {e}")
+    raise
 
+try:
+    FileTranslationPage = import_module_from_path(
+        "file_translation",
+        os.path.join(project_root, "src", "presentation", "pages", "file_translation.py")
+    ).FileTranslationPage
+except FileNotFoundError as e:
+    print(f"Error importing file_translation: {e}")
+    raise
+except Exception as e:
+    print(f"Error importing file_translation: {e}")
+    raise
+
+try:
+    TextTranslationPage = import_module_from_path(
+        "text_translation",
+        os.path.join(project_root, "src", "presentation", "pages", "text_translation.py")
+    ).TextTranslationPage
+except FileNotFoundError as e:
+    print(f"Error importing text_translation: {e}")
+    raise
+except Exception as e:
+    print(f"Error importing text_translation: {e}")
+    raise
+
+# Import DynamicAPIManager
+try:
+    DynamicAPIManager = import_module_from_path(
+        "api_management",
+        os.path.join(project_root, "src", "presentation", "pages", "api_management.py")
+    ).DynamicAPIManager
+except FileNotFoundError as e:
+    print(f"Error importing api_management: {e}")
+    raise
+except Exception as e:
+    print(f"Error importing api_management: {e}")
+    raise
 
 def handle_shutdown(signal, frame):
     try:
