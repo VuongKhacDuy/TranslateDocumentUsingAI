@@ -49,10 +49,33 @@ class TextTranslationPage:
                 }.get
             )
         # Text input
+        if 'ocr_text' not in st.session_state:
+            st.session_state['ocr_text'] = ''
         input_text = st.text_area(
             "Enter text to translate",
+            value=st.session_state['ocr_text'],
             height=200
         )
+        # Nút OCR vùng màn hình
+        if st.button("🖼️ OCR vùng màn hình"):
+            import subprocess
+            import sys
+            result = subprocess.run([sys.executable, "screen_ocr_translate.py"], capture_output=True, text=True)
+            # Lấy kết quả OCR từ stdout
+            ocr_text = ''
+            for line in result.stdout.splitlines():
+                if line.startswith('--- OCR Text ---'):
+                    ocr_text = ''
+                elif line.startswith('--- Translated ---'):
+                    break
+                else:
+                    ocr_text += line + '\n'
+            st.session_state['ocr_text'] = ocr_text.strip()
+            try:
+                st.rerun()
+            except AttributeError:
+                # Nếu phiên bản cũ, bỏ qua rerun hoặc thông báo
+                st.warning("Vui lòng reload lại trang để cập nhật kết quả OCR.")
         # Tách đoạn
         segments = [p for p in input_text.split('\n') if p.strip()] if input_text else []
         selected_segments = []

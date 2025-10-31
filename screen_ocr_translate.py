@@ -26,16 +26,18 @@ if w == 0 or h == 0:
 region_img = screenshot.crop((x, y, x + w, y + h))
 region_img.save('selected_region.png')
 
+from src.domain.translator import Translator
+import os
+
 # Step 3: OCR
 text = pytesseract.image_to_string(region_img, lang='eng+jpn+vie')
 print('--- OCR Text ---')
 print(text)
 
-# Step 4: Translate (example, replace with your pipeline)
-# from src.domain.translator import Translator
-# translator = Translator(model_type='gemini', api_key='YOUR_KEY')
-# translated = translator.translate_batch([text], 'vi')[0]
-# print('--- Translated ---')
-# print(translated)
-
-# Note: You can integrate this with your Streamlit or CLI pipeline as needed.
+# Step 4: Translate (auto)
+# Lấy thông tin API từ biến môi trường hoặc cấu hình
+api_key = os.getenv('GEMINI_API_KEY') or 'YOUR_KEY'
+translator = Translator(model_type='gemini', api_key=api_key)
+translated = translator.translate_batch([text], 'vi')[0]
+print('--- Translated ---')
+print(translated)
