@@ -165,6 +165,15 @@ class QADocumentChatbotPage:
         # Support for multiple file types
         uploaded_file = st.file_uploader("Tải lên tài liệu (txt, csv, xlsx, xls, pdf, doc, docx)", type=["txt", "csv", "xlsx", "xls", "pdf", "doc", "docx"])
 
+        # Clear button to reset uploaded file and conversation
+        if st.button("🗑️ Xóa tài liệu và lịch sử trò chuyện"):
+            # Reset session state
+            st.session_state.chat_history = []
+            st.session_state.vectorstore = None
+            st.session_state.document_content = ""
+            st.success("Đã xóa tài liệu và lịch sử trò chuyện!")
+            st.rerun()
+
         question = st.text_input("Nhập câu hỏi về tài liệu:")
 
         # Document processing
@@ -215,7 +224,7 @@ class QADocumentChatbotPage:
 
         # Process question
         if st.button("Gửi câu hỏi") and question:
-            if st.session_state.vectorstore is None:
+            if st.session_state.vectorstore is None and not st.session_state.document_content:
                 st.warning("Vui lòng tải lên tài liệu trước khi đặt câu hỏi.")
             else:
                 with st.spinner("Đang xử lý câu hỏi..."):
@@ -235,10 +244,14 @@ class QADocumentChatbotPage:
                         else:
                             # Use AI provider (existing code)
                             # Perform similarity search
-                            docs = st.session_state.vectorstore.similarity_search(question, k=4)
-                            
-                            # Create context from retrieved documents
-                            context = "\n\n".join([doc.page_content for doc in docs])
+                            if st.session_state.vectorstore:
+                                docs = st.session_state.vectorstore.similarity_search(question, k=4)
+                                
+                                # Create context from retrieved documents
+                                context = "\n\n".join([doc.page_content for doc in docs])
+                            else:
+                                # Fallback to document content if no vectorstore
+                                context = st.session_state.document_content[:4000] if st.session_state.document_content else ""
                             
                             # Create prompt for QA
                             system_prompt = """You are a helpful AI assistant that answers questions based on provided documents. 
