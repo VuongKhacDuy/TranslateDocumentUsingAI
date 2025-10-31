@@ -24,7 +24,7 @@ class MultiAgentCoordinator:
                 'cash', 'assets', 'liabilities', 'equity', 'debt', 'loan', 
                 'interest', 'tax', 'dividend', 'doanh thu', 'lợi nhuận', 
                 'chi phí', 'thu nhập', 'tài sản', 'nợ', 'vốn', 'đầu tư', 
-                'lãi suất', 'thuế', 'cổ tức'
+                'lãi suất', 'thuế', 'cổ tức', 'financial', 'income', 'earnings'
             },
             'hr': {
                 'employee', 'staff', 'worker', 'team', 'department', 'manager', 
@@ -32,20 +32,22 @@ class MultiAgentCoordinator:
                 'salary', 'benefits', 'leave', 'promotion', 'career', 
                 'nhân viên', 'nhân sự', 'tuyển dụng', 'phỏng vấn', 'ứng viên', 
                 'đào tạo', 'lương', 'thưởng', 'bảo hiểm', 'nghỉ phép', 
-                'thăng chức', 'phát triển'
+                'thăng chức', 'phát triển', 'human resources', 'personnel'
             },
             'equipment': {
                 'equipment', 'machine', 'device', 'tool', 'instrument', 
                 'vehicle', 'engine', 'motor', 'generator', 'pump', 'maintenance', 
                 'repair', 'specification', 'thiết bị', 'máy móc', 'công cụ', 
-                'dụng cụ', 'xe', 'động cơ', 'bảo trì', 'sửa chữa', 'thông số'
+                'dụng cụ', 'xe', 'động cơ', 'bảo trì', 'sửa chữa', 'thông số',
+                'machinery', 'tools', 'devices'
             },
             'infrastructure': {
                 'infrastructure', 'building', 'construction', 'facility', 'plant', 
                 'factory', 'warehouse', 'office', 'area', 'space', 'floor', 
                 'capacity', 'design', 'structure', 'hạ tầng', 'công trình', 
-                'xây dựng', 'cơ sở', 'nhà máy', 'kho hàng', 'văn phòng', 
-                'diện tích', 'không gian', 'tầng', 'sức chứa', 'thiết kế', 'cấu trúc'
+                'xây dựng', 'cơ sở', 'nhà máy', 'kho hàng', 'vản phòng', 
+                'diện tích', 'không gian', 'tầng', 'sức chứa', 'thiết kế', 'cấu trúc',
+                'facilities', 'buildings', 'plants'
             }
         }
     
@@ -61,17 +63,45 @@ class MultiAgentCoordinator:
             # Also check document for domain relevance
             doc_matches = sum(1 for keyword in keywords if keyword in document_lower)
             
-            # If either question or document has strong domain indicators
+            # If question has strong domain indicators or both have moderate indicators
             if matches >= 2 or (matches >= 1 and doc_matches >= 3):
                 relevant_domains.append(domain)
         
-        # If no specific domains identified, return all domains
-        return relevant_domains if relevant_domains else list(self.agents.keys())
+        # If no specific domains identified, try to identify from question context
+        if not relevant_domains:
+            # Check for general keywords that might indicate domain
+            for domain, keywords in self.domain_keywords.items():
+                for keyword in keywords:
+                    if keyword in question_lower:
+                        relevant_domains.append(domain)
+                        break  # Only add domain once
+        
+        # If still no domains identified, return empty list (will use all agents)
+        return relevant_domains
     
     def route_question(self, question: str, document_text: str) -> Dict[str, str]:
         """Route question to appropriate agents and collect responses"""
         # Identify relevant domains
         relevant_domains = self.identify_domains(question, document_text)
+        
+        # If no specific domains identified, analyze document to find relevant ones
+        if not relevant_domains:
+            # Check document content for domain indicators
+            document_lower = document_text.lower()
+            domain_scores = {}
+            
+            for domain, keywords in self.domain_keywords.items():
+                score = sum(1 for keyword in keywords if keyword in document_lower)
+                if score >= 2:  # At least 2 keywords to be considered relevant
+                    domain_scores[domain] = score
+            
+            # Sort by score and take top 2 domains
+            sorted_domains = sorted(domain_scores.items(), key=lambda x: x[1], reverse=True)
+            relevant_domains = [domain for domain, score in sorted_domains[:2]]
+        
+        # If still no domains, return empty dict
+        if not relevant_domains:
+            return {}
         
         # Collect responses from relevant agents
         responses = {}
@@ -92,7 +122,9 @@ class MultiAgentCoordinator:
                     else:
                         response = f"Không có agent phù hợp cho lĩnh vực {domain}"
                     
-                    responses[domain] = response
+                    # Only include response if it's relevant (contains actual information)
+                    if not response.startswith("Tài liệu này không chứa") and not response.startswith("Không tìm thấy thông tin"):
+                        responses[domain] = response
                 except Exception as e:
                     responses[domain] = f"Lỗi khi xử lý câu hỏi cho lĩnh vực {domain}: {str(e)}"
         
@@ -101,7 +133,7 @@ class MultiAgentCoordinator:
     def synthesize_response(self, question: str, responses: Dict[str, str]) -> str:
         """Synthesize responses from multiple agents into a coherent answer"""
         if not responses:
-            return "Không có thông tin phù hợp để trả lời câu hỏi."
+            return "Không tìm thấy thông tin phù hợp trong tài liệu để trả lời câu hỏi."
         
         # If only one domain has a response, return it directly
         if len(responses) == 1:
@@ -130,6 +162,27 @@ class MultiAgentCoordinator:
         try:
             # Route question to appropriate agents
             responses = self.route_question(question, document_text)
+            
+            # If no relevant responses, try local analysis
+            if not responses:
+                # Use a simple local analyzer for basic response
+                sentences = document_text.split('.')
+                relevant_sentences = []
+                question_words = set(question.lower().split())
+                
+                for sentence in sentences:
+                    sentence_words = set(sentence.lower().split())
+                    overlap = len(question_words.intersection(sentence_words))
+                    if overlap > 0:
+                        relevant_sentences.append((sentence.strip(), overlap))
+                
+                relevant_sentences.sort(key=lambda x: x[1], reverse=True)
+                
+                if relevant_sentences:
+                    top_sentences = [sentence for sentence, score in relevant_sentences[:3]]
+                    return "Dựa trên tài liệu, đây là thông tin liên quan:\n\n" + "\n".join(f"- {s}" for s in top_sentences)
+                else:
+                    return "Không tìm thấy thông tin phù hợp trong tài liệu để trả lời câu hỏi."
             
             # Synthesize final response
             final_response = self.synthesize_response(question, responses)
