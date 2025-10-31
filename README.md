@@ -10,9 +10,16 @@ This tool can translate text in cells and shapes within Excel files.
 1. Python must be installed (Python 3.7 or higher is recommended).
 2. Microsoft Excel must be installed (tool uses xlwings library which requires Excel).
 3. This tool only works on Windows or macOS (xlwings requires Excel on these platforms).
-4. Install the required libraries with the following command:
-
-   ```
+4. **Mandatory Virtual Environment Setup**:
+   ```bash
+   # Create virtual environment
+   python -m venv venv
+   
+   # Activate virtual environment
+   ./venv/Scripts/activate    # Windows
+   # source venv/bin/activate # macOS/Linux
+   
+   # Install required libraries
    pip install -r trans-excel-requirements.txt
    ```
 
@@ -28,13 +35,19 @@ This tool can translate text in cells and shapes within Excel files.
 
 ## How to Use
 
-1. Run the trans-excel2.py file for the first time to create the directory structure:
+1. **Activate the virtual environment** (mandatory):
+   ```bash
+   ./venv/Scripts/activate    # Windows
+   # source venv/bin/activate # macOS/Linux
+   ```
+
+2. Run the trans-excel2.py file for the first time to create the directory structure:
 
    ```
    python trans-excel2.py
    ```
-2. Place the Excel files to be translated in the "input" folder
-3. Run the program with optional parameters to specify the target language:
+3. Place the Excel files to be translated in the "input" folder
+4. Run the program with optional parameters to specify the target language:
 
    - Translate from Vietnamese to Japanese (default):
      ```
@@ -44,7 +57,38 @@ This tool can translate text in cells and shapes within Excel files.
      ```
      python trans-excel2.py --to vi
      ```
-4. Translation results will be saved in the "output" folder
+5. Translation results will be saved in the "output" folder
+
+## Environment Requirements
+
+### MANDATORY: Virtual Environment Usage
+
+This project **requires** the use of a virtual environment to avoid dependency conflicts:
+
+1. **Create the virtual environment** (if not already created):
+   ```bash
+   python -m venv venv
+   ```
+
+2. **Always activate the virtual environment** before running any commands:
+   ```bash
+   ./venv/Scripts/activate    # Windows
+   # source venv/bin/activate # macOS/Linux
+   ```
+
+3. **Verify you're in the virtual environment**:
+   ```bash
+   which python    # Should point to project venv
+   pip list        # Should show project-specific packages
+   ```
+
+4. **Install dependencies** (only after activating venv):
+   ```bash
+   pip install -r trans-excel-requirements.txt
+   ```
+
+**Important**: Never run the application without activating the virtual environment first. Doing so may cause dependency conflicts or unexpected behavior.
+
 <!-- 
 ## Custom Language Pairs
 
@@ -208,3 +252,5 @@ If you encounter errors:
 1. Check if the API key is correctly set up in the .env file
 2. Ensure all dependent libraries are installed
 3. Check file and directory access permissions -->
+
+```

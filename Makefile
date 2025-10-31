@@ -23,16 +23,29 @@ setup-env:
 		echo .env file created successfully!) else (echo .env file already exists, skipping creation...)
 
 setup: setup-env
+	@echo "Setting up virtual environment..."
 	python -m venv venv
+	@echo "Activating virtual environment and installing dependencies..."
 	.\venv\Scripts\activate && python.exe -m pip install --upgrade pip && pip install -r trans-excel-requirements.txt
+	@echo "Setup complete! Remember to activate the virtual environment before running:"
+	@echo "  .\venv\Scripts\activate"
 
 run:
+	@echo "IMPORTANT: Make sure you have activated the virtual environment!"
+	@echo "To activate: .\venv\Scripts\activate"
+	@echo "Starting Streamlit application..."
 	.\venv\Scripts\activate && streamlit run src/presentation/streamlit_app.py
 
 run-ja:
+	@echo "IMPORTANT: Make sure you have activated the virtual environment!"
+	@echo "To activate: .\venv\Scripts\activate"
+	@echo "Starting Streamlit application..."
 	.\venv\Scripts\activate && streamlit run src/presentation/streamlit_app.py
 
 run-vi:
+	@echo "IMPORTANT: Make sure you have activated the virtual environment!"
+	@echo "To activate: .\venv\Scripts\activate"
+	@echo "Starting Streamlit application..."
 	.\venv\Scripts\activate && streamlit run src/presentation/streamlit_app.py
 
 clean:

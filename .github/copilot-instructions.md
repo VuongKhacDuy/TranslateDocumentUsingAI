@@ -21,6 +21,11 @@ This is a **multi-modal document translation service** supporting Excel, PDF, Wo
 
 ### Setup & Environment
 ```bash
+# MANDATORY: Always work within the virtual environment
+python -m venv venv              # Create virtual environment (if not exists)
+./venv/Scripts/activate          # Activate virtual environment (Windows)
+# source venv/bin/activate       # Activate virtual environment (macOS/Linux)
+
 make setup          # Creates venv, installs deps, sets up .env template
 make run            # Launches Streamlit app on localhost:8501
 ```
@@ -88,6 +93,28 @@ model_type="gpt" → "gpt-3.5-turbo"
 
 ### System Prompt Customization
 Located at `trans-excel-system-prompt.txt` - customizable for different domains (IT, medical, legal, etc.). Auto-generated on first run with IT/software focus.
+
+## Environment Requirements
+
+### MANDATORY Virtual Environment Usage
+1. **Always activate the virtual environment** before running any commands:
+   ```bash
+   ./venv/Scripts/activate    # Windows
+   # source venv/bin/activate # macOS/Linux
+   ```
+
+2. **Verify you're in the virtual environment**:
+   ```bash
+   which python    # Should point to project venv
+   pip list        # Should show project-specific packages
+   ```
+
+3. **Never install packages globally** - always use the virtual environment
+
+### Dependency Management
+- All dependencies are managed through `requirements.txt`
+- Use `make setup` to automatically install all dependencies in the virtual environment
+- Never modify `requirements.txt` directly unless adding new dependencies
 
 ## Key Files to Reference
 - `src/domain/translator.py` - API abstraction and batch processing logic

@@ -1,11 +1,11 @@
 [
   {
     "provider": "gemini",
-    "api_key": "AIzaSyCX_IG2j66j3t0nMHMv1yBIRk52r2nc05E",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "api_key": "AIzaSyAi7FJAWpigIyGfNBXNLkkyO6OTwCShRzU",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/",
     "model_name": "gemini-2.5-flash",
-    "max_requests_per_minute": 15,
-    "custom_name": "1",
+    "max_requests_per_minute": 30,
+    "custom_name": "Gemini API",
     "is_active": true
   }
 ]

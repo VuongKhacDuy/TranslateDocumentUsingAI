@@ -3,7 +3,7 @@ import streamlit as st
 import json
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from src.infrastructure.multi_api_manager import APIProvider, APIConfig
 
 class DynamicAPIManager:
@@ -18,6 +18,12 @@ class DynamicAPIManager:
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     saved_configs = json.load(f)
+                    # Fix any configuration issues
+                    for config in saved_configs:
+                        if 'base_url' in config:
+                            config['base_url'] = config['base_url'].strip()
+                        if 'model_name' in config:
+                            config['model_name'] = config['model_name'].strip()
                     if self.session_apis not in st.session_state:
                         st.session_state[self.session_apis] = saved_configs
             except Exception as e:
@@ -31,8 +37,16 @@ class DynamicAPIManager:
     def _save_configs(self):
         """Save current API configurations to file"""
         try:
+            # Fix any configuration issues before saving
+            current_apis = st.session_state.get(self.session_apis, [])
+            for config in current_apis:
+                if 'base_url' in config:
+                    config['base_url'] = config['base_url'].strip()
+                if 'model_name' in config:
+                    config['model_name'] = config['model_name'].strip()
+            
             with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(st.session_state[self.session_apis], f, indent=2)
+                json.dump(current_apis, f, indent=2)
         except Exception as e:
             st.error(f"Error saving configs: {e}")
     
@@ -101,7 +115,7 @@ class DynamicAPIManager:
             
             with col3:
                 if st.button("🗑️ Clear All APIs"):
-                    if st.confirm("Are you sure you want to delete all API configurations?"):
+                    if st.checkbox("Confirm deletion of all APIs"):
                         st.session_state[self.session_apis] = []
                         self._save_configs()
                         st.success("All APIs cleared!")
@@ -121,7 +135,7 @@ class DynamicAPIManager:
                         "openai": "🤖 OpenAI GPT",
                         "claude": "🧠 Anthropic Claude", 
                         "deepseek": "🔍 DeepSeek"
-                    }.get(x)
+                    }.get(x, str(x))
                 )
                 
                 api_key = st.text_input(
@@ -159,13 +173,13 @@ class DynamicAPIManager:
                 
                 base_url = st.text_input(
                     "Base URL",
-                    value=config["base_url"],
+                    value=config["base_url"].strip(),  # Strip whitespace/newlines
                     help="API endpoint URL"
                 )
                 
                 model_name = st.text_input(
                     "Model Name",
-                    value=config["model_name"], 
+                    value=config["model_name"].strip(),  # Strip whitespace/newlines
                     help="Model identifier to use"
                 )
                 
@@ -193,8 +207,8 @@ class DynamicAPIManager:
                     self._add_api_config(
                         provider=provider,
                         api_key=api_key.strip(),
-                        base_url=base_url.strip(),
-                        model_name=model_name.strip(),
+                        base_url=base_url.strip() if base_url else config["base_url"].strip(),  # Strip whitespace/newlines
+                        model_name=model_name.strip() if model_name else config["model_name"].strip(),  # Strip whitespace/newlines
                         max_requests_per_minute=max_requests,
                         custom_name=custom_name.strip() or f"{provider.title()} API"
                     )
@@ -204,9 +218,9 @@ class DynamicAPIManager:
         """Add new API configuration"""
         new_config = {
             "provider": provider,
-            "api_key": api_key,
-            "base_url": base_url,
-            "model_name": model_name,
+            "api_key": api_key.strip(),
+            "base_url": base_url.strip(),  # Strip whitespace/newlines
+            "model_name": model_name.strip(),  # Strip whitespace/newlines
             "max_requests_per_minute": max_requests_per_minute,
             "custom_name": custom_name,
             "is_active": True
@@ -257,18 +271,42 @@ class DynamicAPIManager:
         """Test a single API configuration"""
         try:
             from openai import OpenAI
+            import httpx
             
+            # Strip whitespace from config values
+            api_key = api_config["api_key"].strip()
+            base_url = api_config["base_url"].strip()
+            model_name = api_config["model_name"].strip()
+            
+            # Validate config values
+            if not api_key:
+                st.error("API key is missing or empty")
+                return False
+            if not base_url:
+                st.error("Base URL is missing or empty")
+                return False
+            if not model_name:
+                st.error("Model name is missing or empty")
+                return False
+            
+            st.info(f"Testing with:\n- API Key: ...{api_key[-8:]}\n- Base URL: {base_url}\n- Model: {model_name}")
+            
+            # Create client with timeout
             client = OpenAI(
-                api_key=api_config["api_key"],
-                base_url=api_config["base_url"]
+                api_key=api_key,
+                base_url=base_url,
+                timeout=httpx.Timeout(30.0)
             )
             
             # Simple test request
             response = client.chat.completions.create(
-                model=api_config["model_name"],
-                messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=5
+                model=model_name,
+                messages=[{"role": "user", "content": "Hello, this is a test."}],
+                max_tokens=10
             )
+            
+            result_content = response.choices[0].message.content if response.choices[0].message.content else ""
+            st.info(f"Response: {result_content[:100]}{'...' if len(result_content) > 100 else ''}")
             
             return response.choices[0].message.content is not None
             
@@ -276,7 +314,7 @@ class DynamicAPIManager:
             st.error(f"Error testing API: {str(e)}")
             return False
     
-    def get_dynamic_apis(self, provider_filter: str = None) -> List[Dict]:
+    def get_dynamic_apis(self, provider_filter: Optional[str] = None) -> List[Dict]:
         """Get current dynamic API configurations"""
         current_apis = st.session_state.get(self.session_apis, [])
         
@@ -320,9 +358,9 @@ class DynamicAPIManager:
                 
                 config = APIConfig(
                     provider=provider_enum,
-                    api_key=api_data["api_key"],
-                    base_url=api_data["base_url"],
-                    model_name=api_data["model_name"],
+                    api_key=api_data["api_key"].strip(),
+                    base_url=api_data["base_url"].strip(),
+                    model_name=api_data["model_name"].strip(),
                     max_requests_per_minute=api_data.get("max_requests_per_minute", 15)
                 )
                 api_configs.append(config)

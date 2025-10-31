@@ -89,6 +89,18 @@ except Exception as e:
     print(f"Error importing api_management: {e}")
     raise
 
+# Import QADocumentChatbotPage (with error handling to prevent app crash)
+QADocumentChatbotPage = None
+try:
+    QADocumentChatbotPage = import_module_from_path(
+        "qa_document_chatbot",
+        os.path.join(project_root, "src", "presentation", "pages", "qa_document_chatbot.py")
+    ).QADocumentChatbotPage
+except FileNotFoundError as e:
+    print(f"Warning: QA Document Chatbot page not found: {e}")
+except Exception as e:
+    print(f"Warning: Error importing QA Document Chatbot page: {e}")
+
 def handle_shutdown(signal, frame):
     try:
         loop = asyncio.get_event_loop()
@@ -120,8 +132,12 @@ def main():
     
     # Sidebar navigation
     st.sidebar.title("Navigation")
+    # Include QA Document Chatbot in pages list if it was successfully imported
     pages = ["File Translation", "Text Translation", "API Management"]
-    selected_page = st.sidebar.selectbox("Select Page", pages, index=pages.index(st.session_state.current_page))
+    if QADocumentChatbotPage is not None:
+        pages.append("QA Document Chatbot")
+    
+    selected_page = st.sidebar.selectbox("Select Page", pages, index=pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0)
     
     if selected_page != st.session_state.current_page:
         st.session_state.current_page = selected_page
@@ -138,6 +154,9 @@ def main():
         text_page.render()
     elif st.session_state.current_page == "API Management":
         st.session_state.api_manager.render_api_management_ui()
+    elif st.session_state.current_page == "QA Document Chatbot" and QADocumentChatbotPage is not None:
+        qa_page = QADocumentChatbotPage()
+        qa_page.render()
 
 if __name__ == "__main__":
     main()

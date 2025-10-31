@@ -58,6 +58,8 @@ class FileHandler:
             return self._extract_from_word(file_path)
         elif ext == '.csv':
             return self._extract_from_csv(file_path)
+        elif ext == '.txt':
+            return self._extract_from_txt(file_path)
         else:
             raise ValueError(f"Unsupported file type: {ext}")
     
@@ -74,6 +76,9 @@ class FileHandler:
         elif ext == '.csv':
             # CSV is single "page"
             return [self._extract_from_csv(file_path)]
+        elif ext == '.txt':
+            # TXT is single "page"
+            return [self._extract_from_txt(file_path)]
         else:
             raise ValueError(f"Unsupported file type: {ext}")
     
@@ -88,6 +93,8 @@ class FileHandler:
         elif ext in ['.doc', '.docx']:
             return self._get_word_page_count(file_path)
         elif ext == '.csv':
+            return 1
+        elif ext == '.txt':
             return 1
         else:
             return 1
@@ -158,6 +165,78 @@ class FileHandler:
         for column in df.columns:
             texts.extend(df[column].astype(str).tolist())
         return texts
+    
+    def _extract_from_txt(self, file_path):
+        """Extract text from TXT files - optimized for performance"""
+        try:
+            # Read file in chunks for better memory management
+            texts = []
+            with open(file_path, 'r', encoding='utf-8', buffering=8192) as file:
+                content = file.read()
+                
+                # For very large files, limit processing
+                max_chars = 100000  # Limit to 100KB for performance
+                if len(content) > max_chars:
+                    content = content[:max_chars]
+                    print(f"⚠️ File truncated to {max_chars} characters for performance")
+                
+                # Split by paragraphs (double newlines) or lines
+                if '\n\n' in content:
+                    # Split by paragraphs first
+                    paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+                    # Limit number of paragraphs for performance
+                    if len(paragraphs) > 1000:
+                        paragraphs = paragraphs[:1000]
+                        print(f"⚠️ Limited to first 1000 paragraphs for performance")
+                    texts.extend(paragraphs)
+                else:
+                    # Split by lines
+                    lines = [line.strip() for line in content.split('\n') if line.strip()]
+                    # Limit number of lines for performance
+                    if len(lines) > 2000:
+                        lines = lines[:2000]
+                        print(f"⚠️ Limited to first 2000 lines for performance")
+                    texts.extend(lines)
+                    
+            return texts
+        except UnicodeDecodeError:
+            # Try with different encoding
+            try:
+                texts = []
+                with open(file_path, 'r', encoding='utf-8-sig', buffering=8192) as file:
+                    content = file.read()
+                    
+                    # For very large files, limit processing
+                    max_chars = 100000  # Limit to 100KB for performance
+                    if len(content) > max_chars:
+                        content = content[:max_chars]
+                        print(f"⚠️ File truncated to {max_chars} characters for performance")
+                    
+                    # Split by paragraphs (double newlines) or lines
+                    if '\n\n' in content:
+                        # Split by paragraphs first
+                        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+                        # Limit number of paragraphs for performance
+                        if len(paragraphs) > 1000:
+                            paragraphs = paragraphs[:1000]
+                            print(f"⚠️ Limited to first 1000 paragraphs for performance")
+                        texts.extend(paragraphs)
+                    else:
+                        # Split by lines
+                        lines = [line.strip() for line in content.split('\n') if line.strip()]
+                        # Limit number of lines for performance
+                        if len(lines) > 2000:
+                            lines = lines[:2000]
+                            print(f"⚠️ Limited to first 2000 lines for performance")
+                        texts.extend(lines)
+                        
+                return texts
+            except Exception as e:
+                print(f"Error reading TXT file: {e}")
+                return [f"Error reading TXT file: {e}"]
+        except Exception as e:
+            print(f"Error reading TXT file: {e}")
+            return [f"Error reading TXT file: {e}"]
     
     # Page-level extraction methods
     def _extract_from_pdf_by_pages(self, file_path):
